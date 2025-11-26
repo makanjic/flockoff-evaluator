@@ -22,6 +22,7 @@ async def evaluation_step(
     eval_data_dir: str,
     data_dir: str,
     hotkey_list: List[str],
+    lucky_num: int,
 ) -> Tuple[List[float], List[float]]:
     """
     Run LoRA training for each miner (hotkey) and compute normalized scores.
@@ -39,9 +40,6 @@ async def evaluation_step(
     logging.info(f"Using data directory root: {data_dir}")
 
     competition = Competition.from_defaults()
-    # Random seed / lucky number for this evaluation pass
-    lucky_num = int.from_bytes(os.urandom(4), "little")
-
     raw_scores_this_epoch: List[float] = []
 
     # ---- LoRA training / raw score collection ----
@@ -188,6 +186,15 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="If specified, save the output to this file.",
     )
+    parser.add_argument(
+        "--lucky-num",
+        type=int,
+        default=None,
+        help=(
+            "Seed value used in train_lora."
+            "If omitted, a random 32-bit value is generated."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -206,6 +213,14 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
+    # lucky_num handling (your requirement)
+    if args.lucky_num is None:
+        lucky_num = int.from_bytes(os.urandom(4), "little")
+        logging.info(f"Generated lucky_num={lucky_num}")
+    else:
+        lucky_num = args.lucky_num
+        logging.info(f"Using provided lucky_num={lucky_num}")
+
     if args.hotkeys_file:
         logging.info(f"Loading hotkeys from file: {args.hotkeys_file}")
         hotkey_list = load_hotkeys_from_file(args.hotkeys_file)
@@ -216,7 +231,7 @@ if __name__ == "__main__":
     logging.info(f"Found {len(hotkey_list)} hotkeys")
 
     raw_scores, normalized_scores = asyncio.run(
-        evaluation_step(args.eval_data_dir, args.data_dir, hotkey_list)
+        evaluation_step(args.eval_data_dir, args.data_dir, hotkey_list, lucky_num)
     )
 
     # Build structured results
